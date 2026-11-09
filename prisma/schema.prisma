@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// All money columns are integer paise.
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  username       String   @unique
+  passwordHash   String?
+  whatsapp       String?
+  googleId       String?  @unique
+  role           String   @default("USER")
+  balance        Int      @default(0)
+  blocked        Boolean  @default(false)
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  orders   Order[]
+  payments Payment[]
+  ledger   LedgerEntry[]
+  resets   PasswordReset[]
+}
+
+model Service {
+  id                String   @id @default(cuid())
+  providerServiceId String   @unique
+  name              String
+  displayName       String?
+  category          String
+  type              String
+  providerRate      Float
+  min               Int
+  max               Int
+  refill            Boolean  @default(false)
+  cancel            Boolean  @default(false)
+  supported         Boolean  @default(false)
+  enabled           Boolean  @default(false)
+  marginPercent     Float?
+  customPrice       Int?
+  lastSeenAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  orders Order[]
+
+  @@index([enabled, category])
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  userId          String
+  serviceId       String
+  serviceName     String
+  link            String
+  quantity        Int
+  charge          Int
+  refundedAmount  Int       @default(0)
+  status          String    @default("CREATING")
+  providerOrderId String?
+  startCount      Int?
+  remains         Int?
+  lastError       String?
+  lastSyncedAt    DateTime?
+  clientKey       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@unique([userId, clientKey])
+  @@index([status, lastSyncedAt])
+  @@index([userId, createdAt])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  userId            String
+  amount            Int
+  status            String   @default("CREATED")
+  razorpayOrderId   String?  @unique
+  razorpayPaymentId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model LedgerEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  kind         String
+  amount       Int
+  balanceAfter Int
+  note         String
+  orderId      String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  id                 Int   @id @default(1)
+  defaultMargin      Float @default(50)
+  currencyMultiplier Float @default(1)
+}
